@@ -186,6 +186,10 @@ export default function App() {
     } else {
       if (piece.pos.y < 0) {
         setGameOver(true);
+        const prevNeg = parseInt(localStorage.getItem(`negative_${walletAddress}`)) || 0;
+        const newNeg = prevNeg + 1;
+        localStorage.setItem(`negative_${walletAddress}`, newNeg);
+        setNegativeScore(newNeg);
         setGameStarted(false);
         return;
       }

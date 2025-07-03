@@ -53,6 +53,7 @@ export default function App() {
   const [gameOver, setGameOver] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [piece, setPiece] = useState(null);
+  const [nextPiece, setNextPiece] = useState(randomTetromino());
   const [walletAddress, setWalletAddress] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [overallScore, setOverallScore] = useState(0);
@@ -107,7 +108,13 @@ export default function App() {
     setScore(0);
     setGameOver(false);
     setGameStarted(true);
-    setPiece({ shape: newPiece.shape, color: newPiece.color, pos });
+    setPiece({
+      shape: nextPiece.shape,
+      color: nextPiece.color,
+      pos: pos,
+    });
+
+    setNextPiece(randomTetromino());
   };
 
   const stopGame = () => {
@@ -115,6 +122,13 @@ export default function App() {
     setGameOver(false);
     setPiece(null);
     setBoard(createBoard());
+
+    if (walletAddress && score > 0) {
+      const newTotal = overallScore + score;
+      localStorage.setItem(`score_${walletAddress}`, newTotal);
+      setOverallScore(newTotal);
+    }
+
     setScore(0);
   };
 
@@ -148,7 +162,9 @@ export default function App() {
 
   const drop = () => {
     if (!gameStarted || gameOver || !piece) return;
+
     const newPos = { x: piece.pos.x, y: piece.pos.y + 1 };
+
     if (!checkCollision(board, piece.shape, newPos)) {
       setPiece((p) => ({ ...p, pos: newPos }));
     } else {
@@ -157,15 +173,23 @@ export default function App() {
         setGameStarted(false);
         return;
       }
-      const newBoard = clearRows(placePiece(board, piece));
-      setBoard(newBoard);
-      const newPiece = randomTetromino();
-      const pos = { x: Math.floor(COLS / 2) - 2, y: -2 };
-      if (checkCollision(newBoard, newPiece.shape, pos)) {
+
+      const newBoard = placePiece(board, piece);
+      const clearedBoard = clearRows(newBoard);
+      setBoard(clearedBoard);
+
+      const startPos = { x: Math.floor(COLS / 2) - 2, y: -2 };
+
+      if (checkCollision(clearedBoard, nextPiece.shape, startPos)) {
         setGameOver(true);
         setGameStarted(false);
       } else {
-        setPiece({ shape: newPiece.shape, color: newPiece.color, pos });
+        setPiece({
+          shape: nextPiece.shape,
+          color: nextPiece.color,
+          pos: startPos,
+        });
+        setNextPiece(randomTetromino());
       }
     }
   };
@@ -230,23 +254,27 @@ export default function App() {
     };
   }, [gameStarted, gameOver, piece, board]);
 
+
   //#region mintTer
   
   const mintTer = async (amount) => {
-      alert(amount)
-      const tx = await contractInstance.mint(ethers.parseEther(amount));
-      const response = await tx.wait();
-      console.log(response);
-      if(response?.hash){
-        alert("TX success with hash: " +  response.hash)
-         //await getBalance();
-      }
-      else{
-        alert("Tx failed!");
-      }
-    };
-
-  //#endregion
+    alert(amount)
+    const tx = await contractInstance.mint(ethers.parseEther(amount));
+    const response = await tx.wait();
+    console.log(response);
+    if(response?.hash){
+      alert("TX success with hash: " +  response.hash)
+       //await getBalance();
+      // Reset overall score after successful mint
+      localStorage.setItem(`score_${walletAddress}`, "0");
+      // Read back from localStorage and update state to reflect immediately
+      const stored = localStorage.getItem(`score_${walletAddress}`) || "0";
+      setOverallScore(parseInt(stored));
+    }
+    else{
+      alert("Tx failed!");
+    }
+  };
 
   return (
     <div style={{
@@ -289,8 +317,8 @@ export default function App() {
         )}
       </div>
 
-      {/* Game + Token Panel Side by Side */}
-      <div style={{ display: "flex", gap: 24, marginTop: 20 }}>
+      {/* Game + Side Panels */}
+      <div style={{ display: "flex", gap: 24, marginTop: 20, alignItems: "flex-start" }}>
 
         {/* Game Board */}
         <div style={{
@@ -301,6 +329,7 @@ export default function App() {
           border: "4px solid #555",
           overflow: "hidden",
           borderRadius: 8,
+          flexShrink: 0,
         }}>
           {board.map((row, y) =>
             row.map(([filled, color], x) => {
@@ -384,43 +413,96 @@ export default function App() {
           )}
         </div>
 
-        {/* Convert to Token Panel */}
-        {walletAddress && (
-          <div style={{
-            padding: 20,
-            width: 320,
-            borderRadius: 12,
-            background: "linear-gradient(135deg, #292b5f, #2e2f63)",
-            boxShadow: "0 0 15px 3px rgba(130, 101, 230, 0.6)",
-            color: "#eee",
-            textAlign: "center",
-            fontFamily: "'Segoe UI', Tahoma, sans-serif"
-          }}>
-            <h2 style={{ color: "#a9a9ff", fontWeight: "bold" }}>Convert Your Score</h2>
-            <p style={{ fontSize: 18, marginBottom: 10 }}>
-              Wallet: <code style={{ fontSize: 14 }}>{walletAddress}</code>
-            </p>
-            <p style={{ fontSize: 20, fontWeight: "bold", marginBottom: 20 }}>
-              Overall Score: <span style={{ color: "#7df8a3" }}>{overallScore}</span>
-            </p>
-            <button
-              disabled={overallScore === 0}
-              style={{
-                padding: "12px 28px",
-                fontSize: 18,
-                fontWeight: "600",
-                borderRadius: 8,
-                backgroundColor: overallScore === 0 ? "#555" : "#6a8eff",
-                color: overallScore === 0 ? "#999" : "#fff",
-                border: "none",
-                cursor: overallScore === 0 ? "not-allowed" : "pointer",
-              }}
-              onClick={() => mintTer(overallScore.toString())}
-            >
-              Convert to Token
-            </button>
+        {/* Next Piece Panel - always visible with placeholder */}
+        <div style={{
+          marginTop: 0,
+          padding: 12,
+          border: "2px solid #888",
+          borderRadius: 10,
+          backgroundColor: "#222",
+          color: "#fff",
+          textAlign: "center",
+          width: 160,
+          fontFamily: "monospace",
+          userSelect: "none",
+          flexShrink: 0,
+          minHeight: 140,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center"
+        }}>
+          <div style={{ marginBottom: 8, fontWeight: "bold", fontSize: 16 }}>
+            Next Piece:
           </div>
-        )}
+          {nextPiece ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${nextPiece.shape[0].length}, 20px)`,
+                justifyContent: "center",
+                gap: 2,
+              }}
+            >
+              {nextPiece.shape.flatMap((row, y) =>
+                row.map((val, x) => (
+                  <div
+                    key={`${x}-${y}`}
+                    style={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: val
+                        ? `rgb(${nextPiece.color})`
+                        : "transparent",
+                      border: val ? "1px solid #000" : "1px solid #333",
+                      borderRadius: 2,
+                    }}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <div style={{ height: 80, lineHeight: "80px", color: "#666" }}>--</div>
+          )}
+        </div>
+
+        {/* Convert to Token Panel - always visible with placeholder */}
+        <div style={{
+          padding: 20,
+          width: 280,
+          maxWidth: 280,
+          borderRadius: 12,
+          background: "linear-gradient(135deg, #292b5f, #2e2f63)",
+          boxShadow: "0 0 15px 3px rgba(130, 101, 230, 0.6)",
+          color: "#eee",
+          textAlign: "center",
+          fontFamily: "'Segoe UI', Tahoma, sans-serif",
+          userSelect: "none",
+          flexShrink: 0,
+        }}>
+          <h2 style={{ color: "#a9a9ff", fontWeight: "bold", marginBottom: 12 }}>Convert Your Score</h2>
+          <p style={{ fontSize: 18, marginBottom: 10 }}>
+            Wallet: <code style={{ fontSize: 14 }}>{walletAddress ? walletAddress : "--"}</code>
+          </p>
+          <p style={{ fontSize: 20, fontWeight: "bold", marginBottom: 20 }}>
+            Overall Score: <span style={{ color: "#7df8a3" }}>{walletAddress ? overallScore : "--"}</span>
+          </p>
+          <button
+            disabled={!walletAddress || overallScore === 0}
+            style={{
+              padding: "12px 28px",
+              fontSize: 18,
+              fontWeight: "600",
+              borderRadius: 8,
+              backgroundColor: (!walletAddress || overallScore === 0) ? "#555" : "#6a8eff",
+              color: (!walletAddress || overallScore === 0) ? "#999" : "#fff",
+              border: "none",
+              cursor: (!walletAddress || overallScore === 0) ? "not-allowed" : "pointer",
+            }}
+            onClick={() => mintTer(overallScore.toString())}
+          >
+            Convert to Token
+          </button>
+        </div>
       </div>
 
       {/* Stop Game Button */}

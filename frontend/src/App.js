@@ -7,79 +7,24 @@ const DROP_INTERVAL = 800;
 
 const TETROMINOS = {
   0: { shape: [[0]], color: "0,0,0" },
-  I: {
-    shape: [
-      [0, 0, 0, 0],
-      [1, 1, 1, 1],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-    color: "80, 227, 230",
-  },
-  J: {
-    shape: [
-      [1, 0, 0],
-      [1, 1, 1],
-      [0, 0, 0],
-    ],
-    color: "36, 95, 223",
-  },
-  L: {
-    shape: [
-      [0, 0, 1],
-      [1, 1, 1],
-      [0, 0, 0],
-    ],
-    color: "223, 173, 36",
-  },
-  O: {
-    shape: [
-      [1, 1],
-      [1, 1],
-    ],
-    color: "223, 217, 36",
-  },
-  S: {
-    shape: [
-      [0, 1, 1],
-      [1, 1, 0],
-      [0, 0, 0],
-    ],
-    color: "48, 211, 56",
-  },
-  T: {
-    shape: [
-      [0, 1, 0],
-      [1, 1, 1],
-      [0, 0, 0],
-    ],
-    color: "132, 61, 198",
-  },
-  Z: {
-    shape: [
-      [1, 1, 0],
-      [0, 1, 1],
-      [0, 0, 0],
-    ],
-    color: "227, 78, 78",
-  },
+  I: { shape: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], color: "80, 227, 230" },
+  J: { shape: [[1, 0, 0], [1, 1, 1], [0, 0, 0]], color: "36, 95, 223" },
+  L: { shape: [[0, 0, 1], [1, 1, 1], [0, 0, 0]], color: "223, 173, 36" },
+  O: { shape: [[1, 1], [1, 1]], color: "223, 217, 36" },
+  S: { shape: [[0, 1, 1], [1, 1, 0], [0, 0, 0]], color: "48, 211, 56" },
+  T: { shape: [[0, 1, 0], [1, 1, 1], [0, 0, 0]], color: "132, 61, 198" },
+  Z: { shape: [[1, 1, 0], [0, 1, 1], [0, 0, 0]], color: "227, 78, 78" },
 };
 
-const createBoard = () =>
-  Array.from({ length: ROWS }, () => Array(COLS).fill([0, "0,0,0"]));
-
+const createBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill([0, "0,0,0"]));
 function randomTetromino() {
   const tetrominos = "IJLOSTZ";
   const rand = tetrominos[Math.floor(Math.random() * tetrominos.length)];
   return TETROMINOS[rand];
 }
-
 function rotate(matrix) {
-  return matrix[0].map((_, index) =>
-    matrix.map((row) => row[index]).reverse()
-  );
+  return matrix[0].map((_, i) => matrix.map((row) => row[i]).reverse());
 }
-
 function checkCollision(board, shape, pos) {
   for (let y = 0; y < shape.length; y++) {
     for (let x = 0; x < shape[y].length; x++) {
@@ -87,9 +32,7 @@ function checkCollision(board, shape, pos) {
         const newY = pos.y + y;
         const newX = pos.x + x;
         if (
-          newX < 0 ||
-          newX >= COLS ||
-          newY >= ROWS ||
+          newX < 0 || newX >= COLS || newY >= ROWS ||
           (newY >= 0 && board[newY][newX][0] !== 0)
         ) {
           return true;
@@ -106,43 +49,54 @@ export default function App() {
   const [gameOver, setGameOver] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [piece, setPiece] = useState(null);
-  const dropTimeRef = useRef(DROP_INTERVAL);
-
   const [walletAddress, setWalletAddress] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const [overallScore, setOverallScore] = useState(0);
+  const dropTimeRef = useRef(DROP_INTERVAL);
 
   const handleConnectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      alert("MetaMask is not installed!");
-      return;
-    }
-  
+    if (!window.ethereum) return alert("MetaMask is not installed!");
     try {
       setConnecting(true);
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-      }
-    } catch (err) {
-      console.error("Wallet connection failed", err);
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const account = accounts[0];
+      setWalletAddress(account);
+      const stored = localStorage.getItem(`score_${account}`) || 0;
+      setOverallScore(parseInt(stored));
+    } catch {
       alert("Could not connect wallet.");
     } finally {
       setConnecting(false);
-    }  
+    }
   };
+
+  useEffect(() => {
+    if (window.ethereum) {
+      const onAccountsChanged = (accounts) => {
+        const account = accounts[0];
+        setWalletAddress(account || null);
+        const stored = localStorage.getItem(`score_${account}`) || 0;
+        setOverallScore(parseInt(stored));
+      };
+      window.ethereum.on("accountsChanged", onAccountsChanged);
+      return () => window.ethereum.removeListener("accountsChanged", onAccountsChanged);
+    }
+  }, []);
 
   const startGame = () => {
     if (!walletAddress) return;
+    const newPiece = randomTetromino();
+    const pos = { x: Math.floor(COLS / 2) - 2, y: -2 };
+    if (checkCollision(board, newPiece.shape, pos)) {
+      setGameOver(true);
+      setGameStarted(false);
+      return;
+    }
     setBoard(createBoard());
     setScore(0);
     setGameOver(false);
     setGameStarted(true);
-    const newPiece = randomTetromino();
-    setPiece({
-      shape: newPiece.shape,
-      color: newPiece.color,
-      pos: { x: Math.floor(COLS / 2) - 2, y: -2 },
-    });
+    setPiece({ shape: newPiece.shape, color: newPiece.color, pos });
   };
 
   const stopGame = () => {
@@ -156,8 +110,8 @@ export default function App() {
   const placePiece = (board, piece) => {
     const newBoard = board.map((row) => row.slice());
     piece.shape.forEach((row, y) => {
-      row.forEach((value, x) => {
-        if (value && piece.pos.y + y >= 0) {
+      row.forEach((val, x) => {
+        if (val && piece.pos.y + y >= 0) {
           newBoard[piece.pos.y + y][piece.pos.x + x] = [1, piece.color];
         }
       });
@@ -177,22 +131,12 @@ export default function App() {
     while (newBoard.length < ROWS) {
       newBoard.unshift(Array(COLS).fill([0, "0,0,0"]));
     }
-    if (cleared > 0) {
-      setScore((s) => s + cleared * 10);
-    }
+    if (cleared > 0) setScore((s) => s + cleared * 10);
     return newBoard;
   };
 
-  const movePiece = (dir) => {
-    if (!gameStarted || gameOver) return;
-    const newPos = { x: piece.pos.x + dir, y: piece.pos.y };
-    if (!checkCollision(board, piece.shape, newPos)) {
-      setPiece((p) => ({ ...p, pos: newPos }));
-    }
-  };
-
   const drop = () => {
-    if (!gameStarted || gameOver) return;
+    if (!gameStarted || gameOver || !piece) return;
     const newPos = { x: piece.pos.x, y: piece.pos.y + 1 };
     if (!checkCollision(board, piece.shape, newPos)) {
       setPiece((p) => ({ ...p, pos: newPos }));
@@ -202,54 +146,60 @@ export default function App() {
         setGameStarted(false);
         return;
       }
-      const newBoard = placePiece(board, piece);
-      const clearedBoard = clearRows(newBoard);
-      setBoard(clearedBoard);
+      const newBoard = clearRows(placePiece(board, piece));
+      setBoard(newBoard);
       const newPiece = randomTetromino();
-      const startPos = { x: Math.floor(COLS / 2) - 2, y: -2 };
-      if (checkCollision(clearedBoard, newPiece.shape, startPos)) {
+      const pos = { x: Math.floor(COLS / 2) - 2, y: -2 };
+      if (checkCollision(newBoard, newPiece.shape, pos)) {
         setGameOver(true);
         setGameStarted(false);
       } else {
-        setPiece({
-          shape: newPiece.shape,
-          color: newPiece.color,
-          pos: startPos,
-        });
+        setPiece({ shape: newPiece.shape, color: newPiece.color, pos });
       }
     }
   };
 
-  const hardDrop = () => {
-    if (!gameStarted || gameOver) return;
-    let dropY = piece.pos.y;
-    while (!checkCollision(board, piece.shape, { x: piece.pos.x, y: dropY + 1 })) {
-      dropY++;
+  const movePiece = (dir) => {
+    if (!gameStarted || gameOver || !piece) return;
+    const newPos = { x: piece.pos.x + dir, y: piece.pos.y };
+    if (!checkCollision(board, piece.shape, newPos)) {
+      setPiece((p) => ({ ...p, pos: newPos }));
     }
-    setPiece((p) => ({ ...p, pos: { x: p.pos.x, y: dropY } }));
   };
 
   const rotatePiece = () => {
-    if (!gameStarted || gameOver) return;
+    if (!gameStarted || gameOver || !piece) return;
     const rotated = rotate(piece.shape);
     if (!checkCollision(board, rotated, piece.pos)) {
       setPiece((p) => ({ ...p, shape: rotated }));
     }
   };
 
+  const hardDrop = () => {
+    if (!gameStarted || gameOver || !piece) return;
+    let y = piece.pos.y;
+    while (!checkCollision(board, piece.shape, { x: piece.pos.x, y: y + 1 })) y++;
+    setPiece((p) => ({ ...p, pos: { x: p.pos.x, y } }));
+  };
+
+  useEffect(() => {
+    if (gameOver && walletAddress) {
+      const newTotal = overallScore + score;
+      localStorage.setItem(`score_${walletAddress}`, newTotal);
+      setOverallScore(newTotal);
+    }
+  }, [gameOver]);
+
   useEffect(() => {
     if (!gameStarted || gameOver) return;
-    const interval = setInterval(() => {
-      drop();
-    }, dropTimeRef.current);
+    const interval = setInterval(() => drop(), dropTimeRef.current);
     return () => clearInterval(interval);
   }, [piece, board, gameOver, gameStarted]);
 
   useEffect(() => {
     function handleKey(e) {
       if (!gameStarted || gameOver) return;
-      const keysToPrevent = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
-      if (keysToPrevent.includes(e.key)) e.preventDefault();
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
       if (e.key === "ArrowLeft") movePiece(-1);
       else if (e.key === "ArrowRight") movePiece(1);
       else if (e.key === "ArrowDown") {
@@ -270,129 +220,101 @@ export default function App() {
   }, [gameStarted, gameOver, piece, board]);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        margin: 0,
-        background: "linear-gradient(135deg, #1e1e2f, #121212)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "flex-start",
-        paddingTop: 20,
-        color: "#fff",
-        position: "relative",
-      }}
-    >
+    <div style={{
+      minHeight: "100vh",
+      margin: 0,
+      background: "linear-gradient(135deg, #1e1e2f, #121212)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      paddingTop: 20,
+      color: "#fff",
+      position: "relative",
+    }}>
       <h1 style={{ marginBottom: 10 }}>React Tetris</h1>
 
-      {/* Wallet Connect */}
-      <div style={{ position: "absolute", top: 20, right: 20, zIndex: 100 }}>
+      {/* Wallet Button */}
+      <div style={{ position: "absolute", top: 20, right: 20 }}>
         {!walletAddress ? (
-          <button
-            onClick={handleConnectWallet}
-            disabled={connecting}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#ff9900",
-              color: "#000",
-              border: "none",
-              borderRadius: 6,
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
+          <button onClick={handleConnectWallet} disabled={connecting} style={{
+            padding: "8px 16px",
+            backgroundColor: "#ff9900",
+            color: "#000",
+            border: "none",
+            borderRadius: 6,
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}>
             {connecting ? "Connecting..." : "Connect Wallet"}
           </button>
         ) : (
-          <div
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#222",
-              color: "#fff",
-              borderRadius: 6,
-              fontSize: 12,
-              fontFamily: "monospace",
-            }}
-          >
-            Connected: {walletAddress}
+          <div style={{
+            padding: "8px 16px",
+            backgroundColor: "#222",
+            borderRadius: 6,
+            fontFamily: "monospace"
+          }}>
+            Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}<br />
+            🎯 Overall Score: {overallScore}
           </div>
         )}
       </div>
 
-      {/* Game Board */}
-      <div
-        style={{
+      {/* Game + Token Panel Side by Side */}
+      <div style={{ display: "flex", gap: 24, marginTop: 20 }}>
+
+        {/* Game Board */}
+        <div style={{
           position: "relative",
           width: COLS * BLOCK_SIZE,
           height: ROWS * BLOCK_SIZE,
           backgroundColor: "#111",
           border: "4px solid #555",
-          margin: "0 auto",
           overflow: "hidden",
-        }}
-      >
-        {board.map((row, y) =>
-          row.map(([filled, color], x) => {
-            let isCurrent = false;
-            if (gameStarted && piece) {
-              const py = y - piece.pos.y;
-              const px = x - piece.pos.x;
-              if (
-                py >= 0 &&
-                py < piece.shape.length &&
-                px >= 0 &&
-                px < piece.shape[0].length &&
-                piece.shape[py][px]
-              ) {
-                isCurrent = true;
+          borderRadius: 8,
+        }}>
+          {board.map((row, y) =>
+            row.map(([filled, color], x) => {
+              let isCurrent = false;
+              if (gameStarted && piece) {
+                const py = y - piece.pos.y;
+                const px = x - piece.pos.x;
+                if (py >= 0 && py < piece.shape.length && px >= 0 && px < piece.shape[0].length && piece.shape[py][px]) {
+                  isCurrent = true;
+                }
               }
-            }
-            const blockColor = isCurrent ? piece.color : color;
-            const blockFilled = isCurrent || filled;
-            return (
-              <div
-                key={`${x}-${y}`}
-                style={{
+              const blockColor = isCurrent ? piece.color : color;
+              const blockFilled = isCurrent || filled;
+              return (
+                <div key={`${x}-${y}`} style={{
                   width: BLOCK_SIZE - 2,
                   height: BLOCK_SIZE - 2,
-                  backgroundColor: blockFilled
-                    ? `rgba(${blockColor}, 0.9)`
-                    : "transparent",
+                  backgroundColor: blockFilled ? `rgba(${blockColor}, 0.9)` : "transparent",
                   border: blockFilled ? "1px solid #222" : "1px solid #333",
                   boxSizing: "border-box",
                   position: "absolute",
                   top: y * BLOCK_SIZE,
                   left: x * BLOCK_SIZE,
                   borderRadius: 4,
-                }}
-              />
-            );
-          })
-        )}
-
-        {/* Score */}
-        <div
-          style={{
+                }} />
+              );
+            })
+          )}
+          {/* Score display */}
+          <div style={{
             position: "absolute",
             top: 8,
             left: 8,
             backgroundColor: "rgba(0,0,0,0.5)",
             padding: "4px 8px",
             borderRadius: 4,
-            color: "#fff",
             fontSize: 16,
-            fontFamily: "monospace",
-            zIndex: 5,
-          }}
-        >
-          Score: {score}
-        </div>
-
-        {/* Game Over or Start */}
-        {(!gameStarted || gameOver) && (
-          <div
-            style={{
+            fontFamily: "monospace"
+          }}>
+            Score: {score}
+          </div>
+          {(!gameStarted || gameOver) && (
+            <div style={{
               position: "absolute",
               top: 0,
               left: 0,
@@ -405,54 +327,90 @@ export default function App() {
               alignItems: "center",
               zIndex: 99,
               color: "#fff",
-            }}
-          >
-            {gameOver && <div style={{ fontSize: 32 }}>Game Over</div>}
-            {gameOver && (
-              <div style={{ fontSize: 18, marginBottom: 20 }}>
-                Final Score: {score}
-              </div>
-            )}
-            <button
-              onClick={startGame}
-              disabled={!walletAddress}
-              style={{
+              padding: 20,
+              textAlign: "center",
+            }}>
+              {gameOver && <div style={{ fontSize: 32 }}>Game Over</div>}
+              {gameOver && <div style={{ fontSize: 18, marginBottom: 20 }}>Final Score: {score}</div>}
+              {!walletAddress && <div style={{
+                color: "#ffcc00",
+                marginBottom: 12,
+                fontSize: 16,
+                backgroundColor: "#222",
+                padding: "8px 16px",
+                borderRadius: 6,
+              }}>🔐 Connect your wallet to start</div>}
+              <button onClick={startGame} disabled={!walletAddress} style={{
                 padding: "12px 24px",
                 fontSize: 18,
                 borderRadius: 6,
-                backgroundColor: walletAddress ? "#ff5e5e" : "#666",
+                backgroundColor: walletAddress ? "#ff5e5e" : "#555",
                 color: "#fff",
                 border: "none",
-                cursor: walletAddress ? "pointer" : "not-allowed",
+                cursor: walletAddress ? "pointer" : "not-allowed"
+              }}>
+                {gameOver ? "Restart Game" : "Start Game"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Convert to Token Panel */}
+        {walletAddress && (
+          <div style={{
+            padding: 20,
+            width: 320,
+            borderRadius: 12,
+            background: "linear-gradient(135deg, #292b5f, #2e2f63)",
+            boxShadow: "0 0 15px 3px rgba(130, 101, 230, 0.6)",
+            color: "#eee",
+            textAlign: "center",
+            fontFamily: "'Segoe UI', Tahoma, sans-serif"
+          }}>
+            <h2 style={{ color: "#a9a9ff", fontWeight: "bold" }}>Convert Your Score</h2>
+            <p style={{ fontSize: 18, marginBottom: 10 }}>
+              Wallet: <code style={{ fontSize: 14 }}>{walletAddress}</code>
+            </p>
+            <p style={{ fontSize: 20, fontWeight: "bold", marginBottom: 20 }}>
+              Overall Score: <span style={{ color: "#7df8a3" }}>{overallScore}</span>
+            </p>
+            <button
+              disabled={overallScore === 0}
+              style={{
+                padding: "12px 28px",
+                fontSize: 18,
+                fontWeight: "600",
+                borderRadius: 8,
+                backgroundColor: overallScore === 0 ? "#555" : "#6a8eff",
+                color: overallScore === 0 ? "#999" : "#fff",
+                border: "none",
+                cursor: overallScore === 0 ? "not-allowed" : "pointer",
               }}
-              title={walletAddress ? "" : "Connect wallet to start the game"}
+              onClick={() => alert("Convert to token functionality coming soon!")}
             >
-              {gameOver ? "Restart Game" : "Start Game"}
+              Convert to Token
             </button>
           </div>
         )}
       </div>
 
+      {/* Stop Game Button */}
       {gameStarted && !gameOver && (
-        <button
-          onClick={stopGame}
-          style={{
-            marginTop: 16,
-            padding: "8px 16px",
-            fontSize: 14,
-            borderRadius: 6,
-            backgroundColor: "#444",
-            color: "#fff",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={stopGame} style={{
+          marginTop: 16,
+          padding: "8px 16px",
+          fontSize: 14,
+          borderRadius: 6,
+          backgroundColor: "#444",
+          color: "#fff",
+          border: "none"
+        }}>
           Stop Game
         </button>
       )}
 
       <div style={{ marginTop: 20, fontSize: 14, color: "#ccc" }}>
-        Controls: ← → move, ↑ rotate, ↓ soft drop, Space hard drop
+        Controls: ← → move, ↑ rotate, ↓ drop, Space = hard drop
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ const MintForm = ({ onMint }) => {
             Token URI
           </label>
           <input
-            type="url"
+            // type="url"
             className="form-control"
             id="tokenURI"
             value={uri}

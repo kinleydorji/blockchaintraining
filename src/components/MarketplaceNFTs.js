@@ -20,13 +20,13 @@ function MarketplaceNFTCard({ nft, onBuy }) {
             Token ID: <strong>{nft.tokenId}</strong>
           </p>
           <p className="small">
-            Price: <span className="badge bg-info text-dark">{nft.price}</span>
+            Price: <span className="badge bg-info text-dark">{nft.price}</span> ETH
           </p>
         </div>
         <div className="card-footer bg-transparent border-0">
           <button
             className="btn btn-outline-primary w-100"
-            onClick={() => onBuy(nft.tokenId)}
+            onClick={() => onBuy(nft.tokenId, nft.price)}
           >
             <i className="bi bi-cart-plus me-2"></i>Buy NFT
           </button>

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
+import {ethers} from "ethers";
 
 const ROWS = 20;
 const COLS = 10;
 const BLOCK_SIZE = 30;
 const DROP_INTERVAL = 800;
+
+const Ter_CONTRACT_ABI = require("./contracts/Ter.json").abi;
+const Ter_CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 const TETROMINOS = {
   0: { shape: [[0]], color: "0,0,0" },
@@ -53,6 +57,7 @@ export default function App() {
   const [connecting, setConnecting] = useState(false);
   const [overallScore, setOverallScore] = useState(0);
   const dropTimeRef = useRef(DROP_INTERVAL);
+  const [contractInstance, setContractInstance] = useState(null);
 
   const handleConnectWallet = async () => {
     if (!window.ethereum) return alert("MetaMask is not installed!");
@@ -63,6 +68,12 @@ export default function App() {
       setWalletAddress(account);
       const stored = localStorage.getItem(`score_${account}`) || 0;
       setOverallScore(parseInt(stored));
+
+      var provider = new ethers.BrowserProvider(window.ethereum);
+      var signer = await provider.getSigner();
+      var ter = new ethers.Contract(Ter_CONTRACT_ADDRESS, Ter_CONTRACT_ABI, signer);
+      setContractInstance(ter);
+
     } catch {
       alert("Could not connect wallet.");
     } finally {
@@ -218,6 +229,24 @@ export default function App() {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [gameStarted, gameOver, piece, board]);
+
+  //#region mintTer
+  
+  const mintTer = async (amount) => {
+      alert(amount)
+      const tx = await contractInstance.mint(ethers.parseEther(amount));
+      const response = await tx.wait();
+      console.log(response);
+      if(response?.hash){
+        alert("TX success with hash: " +  response.hash)
+         //await getBalance();
+      }
+      else{
+        alert("Tx failed!");
+      }
+    };
+
+  //#endregion
 
   return (
     <div style={{
@@ -386,7 +415,7 @@ export default function App() {
                 border: "none",
                 cursor: overallScore === 0 ? "not-allowed" : "pointer",
               }}
-              onClick={() => alert("Convert to token functionality coming soon!")}
+              onClick={() => mintTer(overallScore.toString())}
             >
               Convert to Token
             </button>

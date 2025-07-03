@@ -61,6 +61,7 @@ export default function App() {
   const dropTimeRef = useRef(DROP_INTERVAL);
   const [contractInstance, setContractInstance] = useState(null);
   const [mintedTerBalance, setMintedTerBalance] = useState(0);
+  const [mintedBalance, setMintedBalance] = useState(0);
   const [view, setView] = useState("game"); // 'game' or 'profile'
   const handleConnectWallet = async () => {
     if (!window.ethereum) return alert("MetaMask is not installed!");
@@ -77,7 +78,7 @@ export default function App() {
       var signer = await provider.getSigner();
       var ter = new ethers.Contract(Ter_CONTRACT_ADDRESS, Ter_CONTRACT_ABI, signer);
       setContractInstance(ter);
-
+      await getBalance(account, ter);
     } catch {
       alert("Could not connect wallet.");
     } finally {
@@ -100,6 +101,11 @@ export default function App() {
 
   const startGame = () => {
     if (!walletAddress) return;
+    if(mintedBalance == 0.0)
+    {
+      alert("Need balance to play game!")
+      return;
+    }
     const newPiece = randomTetromino();
     const pos = { x: Math.floor(COLS / 2) - 2, y: -2 };
     if (checkCollision(board, newPiece.shape, pos)) {
@@ -285,6 +291,17 @@ export default function App() {
       alert("Tx failed!");
     }
   };
+
+  // Get Balance
+  const getBalance = async (walletAddress, contractInstance) => {
+  if (contractInstance && walletAddress) {
+    const rawBalance = await contractInstance.balanceOf(walletAddress);
+    const formatted = ethers.formatEther(rawBalance.toString());
+    console.log("balance=> "+ formatted)
+    setMintedBalance(formatted);
+    }
+  };
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -499,9 +516,10 @@ export default function App() {
         walletAddress={walletAddress}
         overallScore={overallScore}
         negativeScore={negativeScore}
-        mintedTerBalance={mintedTerBalance}
+        //mintedTerBalance={mintedTerBalance}
         mintTer={mintTer}
         backToGame={() => setView("game")}
+        mintedBalance={mintedBalance}
       />
       )}
       {view === "game" ?(

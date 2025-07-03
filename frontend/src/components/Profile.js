@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function Profile({ walletAddress, overallScore, negativeScore, tokenTransfer, mintTer }) {
+function Profile({ walletAddress, overallScore, negativeScore, tokenTransfer, mintTer, mintedBalance }) {
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState("");
@@ -84,7 +84,7 @@ function Profile({ walletAddress, overallScore, negativeScore, tokenTransfer, mi
       }}>
         <div style={{ fontSize: 14, color: "#ccc" }}>Your TER Balance</div>
         <div style={{ fontSize: 22, fontWeight: 700, color: "#ffd86b" }}>
-          {walletAddress ? negativeScore : "--"}
+          {walletAddress ? mintedBalance : "--"}
         </div>
         <button
           disabled={!walletAddress || overallScore === 0}

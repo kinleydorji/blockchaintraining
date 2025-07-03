@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {ethers} from "ethers";
-
+import Profile from "./components/Profile";
 const ROWS = 20;
 const COLS = 10;
 const BLOCK_SIZE = 30;
@@ -50,6 +50,7 @@ function checkCollision(board, shape, pos) {
 export default function App() {
   const [board, setBoard] = useState(createBoard());
   const [score, setScore] = useState(0);
+  const [negativeScore, setNegativeScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [piece, setPiece] = useState(null);
@@ -59,7 +60,8 @@ export default function App() {
   const [overallScore, setOverallScore] = useState(0);
   const dropTimeRef = useRef(DROP_INTERVAL);
   const [contractInstance, setContractInstance] = useState(null);
-
+  const [mintedTerBalance, setMintedTerBalance] = useState(0);
+  const [view, setView] = useState("game"); // 'game' or 'profile'
   const handleConnectWallet = async () => {
     if (!window.ethereum) return alert("MetaMask is not installed!");
     try {
@@ -68,8 +70,9 @@ export default function App() {
       const account = accounts[0];
       setWalletAddress(account);
       const stored = localStorage.getItem(`score_${account}`) || 0;
+      const storedNeg = localStorage.getItem(`negative_${account}`) || 0;
       setOverallScore(parseInt(stored));
-
+      setNegativeScore(parseInt(storedNeg));
       var provider = new ethers.BrowserProvider(window.ethereum);
       var signer = await provider.getSigner();
       var ter = new ethers.Contract(Ter_CONTRACT_ADDRESS, Ter_CONTRACT_ABI, signer);
@@ -123,10 +126,17 @@ export default function App() {
     setPiece(null);
     setBoard(createBoard());
 
-    if (walletAddress && score > 0) {
-      const newTotal = overallScore + score;
-      localStorage.setItem(`score_${walletAddress}`, newTotal);
-      setOverallScore(newTotal);
+    if (walletAddress) {
+      if (score > 0) {
+        const newTotal = overallScore + score;
+        localStorage.setItem(`score_${walletAddress}`, newTotal);
+        setOverallScore(newTotal);
+      } else {
+        const prevNeg = parseInt(localStorage.getItem(`negative_${walletAddress}`)) || 0;
+        const newNeg = prevNeg + 1;
+        localStorage.setItem(`negative_${walletAddress}`, newNeg);
+        setNegativeScore(newNeg);
+      }
     }
 
     setScore(0);
@@ -275,7 +285,6 @@ export default function App() {
       alert("Tx failed!");
     }
   };
-
   return (
     <div style={{
       minHeight: "100vh",
@@ -312,217 +321,212 @@ export default function App() {
             fontFamily: "monospace"
           }}>
             Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}<br />
-            🎯 Overall Score: {overallScore}
+            🎯 Overall Score: {overallScore}<br/>
+            🛑 Negative Score: {negativeScore}<br/>
+            🪙 Minted TER: {mintedTerBalance.toFixed(2)}<br/>
+              <button
+                onClick={() => setView(view === "game" ? "profile" : "game")}
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#4a4a4a",
+                  color: "#fff",
+                  borderRadius: 6,
+                  border: "none"
+                }}
+              >
+                {view === "game" ? "View Profile" : "Back to Game"}
+              </button>
+          </div>
+
+
+        )}
+      </div>
+      {view === "game" ? (
+        // {/* Game + Side Panels */}
+
+      <div style={{ display: "flex", gap: 24, marginTop: 20, alignItems: "flex-start" }}>
+
+      {/* Game Board */}
+      <div style={{
+        position: "relative",
+        width: COLS * BLOCK_SIZE,
+        height: ROWS * BLOCK_SIZE,
+        backgroundColor: "#111",
+        border: "4px solid #555",
+        overflow: "hidden",
+        borderRadius: 8,
+        flexShrink: 0,
+      }}>
+        {board.map((row, y) =>
+          row.map(([filled, color], x) => {
+            let isCurrent = false;
+            if (gameStarted && piece) {
+              const py = y - piece.pos.y;
+              const px = x - piece.pos.x;
+              if (py >= 0 && py < piece.shape.length && px >= 0 && px < piece.shape[0].length && piece.shape[py][px]) {
+                isCurrent = true;
+              }
+            }
+            const blockColor = isCurrent ? piece.color : color;
+            const blockFilled = isCurrent || filled;
+            return (
+              <div key={`${x}-${y}`} style={{
+                width: BLOCK_SIZE - 2,
+                height: BLOCK_SIZE - 2,
+                backgroundColor: blockFilled ? `rgba(${blockColor}, 0.9)` : "transparent",
+                border: blockFilled ? "1px solid #222" : "1px solid #333",
+                boxSizing: "border-box",
+                position: "absolute",
+                top: y * BLOCK_SIZE,
+                left: x * BLOCK_SIZE,
+                borderRadius: 4,
+              }} />
+            );
+          })
+        )}
+        {/* Score display */}
+        <div style={{
+          position: "absolute",
+          top: 8,
+          left: 8,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          padding: "4px 8px",
+          borderRadius: 4,
+          fontSize: 16,
+          fontFamily: "monospace"
+        }}>
+          Score: {score}
+        </div>
+        {(!gameStarted || gameOver) && (
+          <div style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.85)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99,
+            color: "#fff",
+            padding: 20,
+            textAlign: "center",
+          }}>
+            {gameOver && <div style={{ fontSize: 32 }}>Game Over</div>}
+            {gameOver && <div style={{ fontSize: 18, marginBottom: 20 }}>Final Score: {score}</div>}
+            {!walletAddress && <div style={{
+              color: "#ffcc00",
+              marginBottom: 12,
+              fontSize: 16,
+              backgroundColor: "#222",
+              padding: "8px 16px",
+              borderRadius: 6,
+            }}>🔐 Connect your wallet to start</div>}
+            <button onClick={startGame} disabled={!walletAddress} style={{
+              padding: "12px 24px",
+              fontSize: 18,
+              borderRadius: 6,
+              backgroundColor: walletAddress ? "#ff5e5e" : "#555",
+              color: "#fff",
+              border: "none",
+              cursor: walletAddress ? "pointer" : "not-allowed"
+            }}>
+              {gameOver ? "Restart Game" : "Start Game"}
+            </button>
           </div>
         )}
       </div>
 
-      {/* Game + Side Panels */}
-      <div style={{ display: "flex", gap: 24, marginTop: 20, alignItems: "flex-start" }}>
-
-        {/* Game Board */}
-        <div style={{
-          position: "relative",
-          width: COLS * BLOCK_SIZE,
-          height: ROWS * BLOCK_SIZE,
-          backgroundColor: "#111",
-          border: "4px solid #555",
-          overflow: "hidden",
-          borderRadius: 8,
-          flexShrink: 0,
-        }}>
-          {board.map((row, y) =>
-            row.map(([filled, color], x) => {
-              let isCurrent = false;
-              if (gameStarted && piece) {
-                const py = y - piece.pos.y;
-                const px = x - piece.pos.x;
-                if (py >= 0 && py < piece.shape.length && px >= 0 && px < piece.shape[0].length && piece.shape[py][px]) {
-                  isCurrent = true;
-                }
-              }
-              const blockColor = isCurrent ? piece.color : color;
-              const blockFilled = isCurrent || filled;
-              return (
-                <div key={`${x}-${y}`} style={{
-                  width: BLOCK_SIZE - 2,
-                  height: BLOCK_SIZE - 2,
-                  backgroundColor: blockFilled ? `rgba(${blockColor}, 0.9)` : "transparent",
-                  border: blockFilled ? "1px solid #222" : "1px solid #333",
-                  boxSizing: "border-box",
-                  position: "absolute",
-                  top: y * BLOCK_SIZE,
-                  left: x * BLOCK_SIZE,
-                  borderRadius: 4,
-                }} />
-              );
-            })
-          )}
-          {/* Score display */}
-          <div style={{
-            position: "absolute",
-            top: 8,
-            left: 8,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            padding: "4px 8px",
-            borderRadius: 4,
-            fontSize: 16,
-            fontFamily: "monospace"
-          }}>
-            Score: {score}
-          </div>
-          {(!gameStarted || gameOver) && (
-            <div style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              backgroundColor: "rgba(0,0,0,0.85)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              alignItems: "center",
-              zIndex: 99,
-              color: "#fff",
-              padding: 20,
-              textAlign: "center",
-            }}>
-              {gameOver && <div style={{ fontSize: 32 }}>Game Over</div>}
-              {gameOver && <div style={{ fontSize: 18, marginBottom: 20 }}>Final Score: {score}</div>}
-              {!walletAddress && <div style={{
-                color: "#ffcc00",
-                marginBottom: 12,
-                fontSize: 16,
-                backgroundColor: "#222",
-                padding: "8px 16px",
-                borderRadius: 6,
-              }}>🔐 Connect your wallet to start</div>}
-              <button onClick={startGame} disabled={!walletAddress} style={{
-                padding: "12px 24px",
-                fontSize: 18,
-                borderRadius: 6,
-                backgroundColor: walletAddress ? "#ff5e5e" : "#555",
-                color: "#fff",
-                border: "none",
-                cursor: walletAddress ? "pointer" : "not-allowed"
-              }}>
-                {gameOver ? "Restart Game" : "Start Game"}
-              </button>
-            </div>
-          )}
+      {/* Next Piece Panel - always visible with placeholder */}
+      <div style={{
+        marginTop: 0,
+        padding: 12,
+        border: "2px solid #888",
+        borderRadius: 10,
+        backgroundColor: "#222",
+        color: "#fff",
+        textAlign: "center",
+        width: 160,
+        fontFamily: "monospace",
+        userSelect: "none",
+        flexShrink: 0,
+        minHeight: 140,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center"
+      }}>
+        <div style={{ marginBottom: 8, fontWeight: "bold", fontSize: 16 }}>
+          Next Piece:
         </div>
-
-        {/* Next Piece Panel - always visible with placeholder */}
-        <div style={{
-          marginTop: 0,
-          padding: 12,
-          border: "2px solid #888",
-          borderRadius: 10,
-          backgroundColor: "#222",
-          color: "#fff",
-          textAlign: "center",
-          width: 160,
-          fontFamily: "monospace",
-          userSelect: "none",
-          flexShrink: 0,
-          minHeight: 140,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center"
-        }}>
-          <div style={{ marginBottom: 8, fontWeight: "bold", fontSize: 16 }}>
-            Next Piece:
-          </div>
-          {nextPiece ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${nextPiece.shape[0].length}, 20px)`,
-                justifyContent: "center",
-                gap: 2,
-              }}
-            >
-              {nextPiece.shape.flatMap((row, y) =>
-                row.map((val, x) => (
-                  <div
-                    key={`${x}-${y}`}
-                    style={{
-                      width: 20,
-                      height: 20,
-                      backgroundColor: val
-                        ? `rgb(${nextPiece.color})`
-                        : "transparent",
-                      border: val ? "1px solid #000" : "1px solid #333",
-                      borderRadius: 2,
-                    }}
-                  />
-                ))
-              )}
-            </div>
-          ) : (
-            <div style={{ height: 80, lineHeight: "80px", color: "#666" }}>--</div>
-          )}
-        </div>
-
-        {/* Convert to Token Panel - always visible with placeholder */}
-        <div style={{
-          padding: 20,
-          width: 280,
-          maxWidth: 280,
-          borderRadius: 12,
-          background: "linear-gradient(135deg, #292b5f, #2e2f63)",
-          boxShadow: "0 0 15px 3px rgba(130, 101, 230, 0.6)",
-          color: "#eee",
-          textAlign: "center",
-          fontFamily: "'Segoe UI', Tahoma, sans-serif",
-          userSelect: "none",
-          flexShrink: 0,
-        }}>
-          <h2 style={{ color: "#a9a9ff", fontWeight: "bold", marginBottom: 12 }}>Convert Your Score</h2>
-          <p style={{ fontSize: 18, marginBottom: 10 }}>
-            Wallet: <code style={{ fontSize: 14 }}>{walletAddress ? walletAddress : "--"}</code>
-          </p>
-          <p style={{ fontSize: 20, fontWeight: "bold", marginBottom: 20 }}>
-            Overall Score: <span style={{ color: "#7df8a3" }}>{walletAddress ? overallScore : "--"}</span>
-          </p>
-          <button
-            disabled={!walletAddress || overallScore === 0}
+        {nextPiece ? (
+          <div
             style={{
-              padding: "12px 28px",
-              fontSize: 18,
-              fontWeight: "600",
-              borderRadius: 8,
-              backgroundColor: (!walletAddress || overallScore === 0) ? "#555" : "#6a8eff",
-              color: (!walletAddress || overallScore === 0) ? "#999" : "#fff",
-              border: "none",
-              cursor: (!walletAddress || overallScore === 0) ? "not-allowed" : "pointer",
+              display: "grid",
+              gridTemplateColumns: `repeat(${nextPiece.shape[0].length}, 20px)`,
+              justifyContent: "center",
+              gap: 2,
             }}
-            onClick={() => mintTer(overallScore.toString())}
           >
-            Convert to Token
-          </button>
-        </div>
+            {nextPiece.shape.flatMap((row, y) =>
+              row.map((val, x) => (
+                <div
+                  key={`${x}-${y}`}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    backgroundColor: val
+                      ? `rgb(${nextPiece.color})`
+                      : "transparent",
+                    border: val ? "1px solid #000" : "1px solid #333",
+                    borderRadius: 2,
+                  }}
+                />
+              ))
+            )}
+          </div>
+        ) : (
+          <div style={{ height: 80, lineHeight: "80px", color: "#666" }}>--</div>
+        )}
       </div>
 
-      {/* Stop Game Button */}
-      {gameStarted && !gameOver && (
-        <button onClick={stopGame} style={{
-          marginTop: 16,
-          padding: "8px 16px",
-          fontSize: 14,
-          borderRadius: 6,
-          backgroundColor: "#444",
-          color: "#fff",
-          border: "none"
-        }}>
-          Stop Game
-        </button>
+      {/* Convert to Token Panel - always visible with placeholder */}
+   
+    </div>
+      ):(
+        <Profile
+        walletAddress={walletAddress}
+        overallScore={overallScore}
+        negativeScore={negativeScore}
+        mintedTerBalance={mintedTerBalance}
+        mintTer={mintTer}
+        backToGame={() => setView("game")}
+      />
       )}
-
-      <div style={{ marginTop: 20, fontSize: 14, color: "#ccc" }}>
+      {view === "game" ?(
+        // {/* Stop Game Button */}
+        <div style={{ marginTop: 20, fontSize: 14, color: "#ccc" }}>
         Controls: ← → move, ↑ rotate, ↓ drop, Space = hard drop
       </div>
+      ):(<div></div>)}
+
+    {gameStarted && !gameOver && (
+          <button onClick={stopGame} style={{
+            marginTop: 16,
+            padding: "8px 16px",
+            fontSize: 14,
+            borderRadius: 6,
+            backgroundColor: "#444",
+            color: "#fff",
+            border: "none"
+          }}>
+            Stop Game
+          </button>
+        )}
+      
     </div>
+    
+
   );
 }

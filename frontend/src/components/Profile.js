@@ -89,20 +89,20 @@ function Profile({ walletAddress, overallScore, negativeScore, tokenTransfer, mi
           {walletAddress ? mintedBalance : "--"}
         </div>
         <button
-          disabled={!walletAddress || overallScore === 0}
+          disabled={!walletAddress || (overallScore === 0 && negativeScore === 0)}
           style={{
             marginTop: 12,
             padding: "10px 20px",
             fontSize: 16,
             fontWeight: 600,
             borderRadius: 8,
-            backgroundColor: (!walletAddress || overallScore === 0) ? "#666" : "#6a8eff",
+            backgroundColor: (!walletAddress || (overallScore === 0 && negativeScore === 0)) ? "#666" : "#6a8eff",
             color: "#fff",
             border: "none",
-            cursor: (!walletAddress || overallScore === 0) ? "not-allowed" : "pointer",
+            cursor: (!walletAddress || (overallScore === 0 && negativeScore === 0)) ? "not-allowed" : "pointer",
             transition: "background 0.3s ease"
           }}
-          onClick={() => mintTer(overallScore.toString())}
+          onClick={() => mintTer(overallScore.toString(), negativeScore.toString())}
         >
           Convert Score to TER
         </button>

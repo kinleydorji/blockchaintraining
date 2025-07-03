@@ -7,7 +7,7 @@ const BLOCK_SIZE = 30;
 const DROP_INTERVAL = 800;
 
 const Ter_CONTRACT_ABI = require("./contracts/Ter.json").abi;
-const Ter_CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const Ter_CONTRACT_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 
 const TETROMINOS = {
   0: { shape: [[0]], color: "0,0,0" },
@@ -273,22 +273,46 @@ export default function App() {
 
   //#region mintTer
   
-  const mintTer = async (amount) => {
-    alert(amount)
-    const tx = await contractInstance.mint(ethers.parseEther(amount));
-    const response = await tx.wait();
-    console.log(response);
-    if(response?.hash){
-      alert("TX success with hash: " +  response.hash)
-       //await getBalance();
-      // Reset overall score after successful mint
-      localStorage.setItem(`score_${walletAddress}`, "0");
-      // Read back from localStorage and update state to reflect immediately
-      const stored = localStorage.getItem(`score_${walletAddress}`) || "0";
-      setOverallScore(parseInt(stored));
+  const mintTer = async (amount, negative_amount) => {
+    // alert(amount)
+    if(amount > 0){
+      const tx = await contractInstance.mint(ethers.parseEther(amount));
+      const response = await tx.wait();
+      console.log(response);
+      if(response?.hash){
+        alert("TX success with hash: " +  response.hash)
+         //await getBalance();
+        // Reset overall score after successful mint
+        localStorage.setItem(`score_${walletAddress}`, "0");
+        // Read back from localStorage and update state to reflect immediately
+        const stored = localStorage.getItem(`score_${walletAddress}`) || "0";
+        setOverallScore(parseInt(stored));
+        await getBalance(walletAddress, contractInstance);
+      }
+      else{
+        alert("Tx failed!");
+      }
     }
-    else{
-      alert("Tx failed!");
+    if(negative_amount>0){
+      await getBalance(walletAddress, contractInstance);
+      if(mintedBalance - negative_amount < 0){
+        const tx = await contractInstance.burn(ethers.parseEther(ethers.parseEther(mintedBalance)));
+        var response = await tx.wait();
+
+      }
+      else{
+        const tx = await contractInstance.burn(ethers.parseEther(negative_amount));
+        var response = await tx.wait();
+      }
+      if(response?.hash){
+        localStorage.setItem(`negative_${walletAddress}`, "0");
+        const storedNeg = localStorage.getItem(`negative_${walletAddress}`) || 0;
+        setNegativeScore(parseInt(storedNeg));
+        await getBalance(walletAddress, contractInstance);
+      }
+      else{
+        alert("Tx failed!");
+      }
     }
   };
 
@@ -353,7 +377,7 @@ export default function App() {
             Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}<br />
             🎯 Overall Score: {overallScore}<br/>
             🛑 Negative Score: {negativeScore}<br/>
-            🪙 Minted TER: {mintedTerBalance.toFixed(2)}<br/>
+            🪙 Minted TER: {mintedBalance}<br/>
               <button
                 onClick={() => setView(view === "game" ? "profile" : "game")}
                 style={{

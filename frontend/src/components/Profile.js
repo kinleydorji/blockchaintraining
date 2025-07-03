@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { tokenTransfer } from "../App.js";
 
 function Profile({ walletAddress, overallScore, negativeScore, tokenTransfer, mintTer, mintedBalance }) {
   const [to, setTo] = useState("");
@@ -18,6 +19,7 @@ function Profile({ walletAddress, overallScore, negativeScore, tokenTransfer, mi
       setStatus("❌ Error: " + (err.message || err));
     }
   };
+
 
   return (
     <div style={{

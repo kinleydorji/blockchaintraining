@@ -301,6 +301,19 @@ export default function App() {
     setMintedBalance(formatted);
     }
   };
+  
+ //Transfer Token
+  const tokenTransfer = async (to, amount) =>{
+    const tx = await contractInstance.transfer(to, ethers.parseEther(amount));
+    const response = await tx.wait();
+    console.log(response);
+    if(response?.hash){
+      alert("TX success with hash: " +  response.hash)
+    }
+    else{
+      alert("Tx failed!");
+    }
+  }
 
   return (
     <div style={{
@@ -517,6 +530,7 @@ export default function App() {
         overallScore={overallScore}
         negativeScore={negativeScore}
         //mintedTerBalance={mintedTerBalance}
+        tokenTransfer = {tokenTransfer}
         mintTer={mintTer}
         backToGame={() => setView("game")}
         mintedBalance={mintedBalance}

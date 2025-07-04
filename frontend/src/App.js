@@ -339,6 +339,7 @@ export default function App() {
     console.log(response);
     if(response?.hash){
       alert("TX success with hash: " +  response.hash)
+      await getBalance(walletAddress, contractInstance);
     }
     else{
       alert("Tx failed!");
@@ -357,7 +358,7 @@ export default function App() {
       color: "#fff",
       position: "relative",
     }}>
-      <h1 style={{ marginBottom: 10 }}>React Tetris</h1>
+      <h1 style={{ marginBottom: 10 }}>Tetris TER</h1>
 
       {/* Wallet Button */}
       <div style={{ position: "absolute", top: 20, right: 20 }}>
